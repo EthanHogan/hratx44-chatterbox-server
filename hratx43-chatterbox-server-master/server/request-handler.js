@@ -11,9 +11,7 @@ this file and include it in basic-server.js so that it actually works.
 *Hint* Check out the node module documentation at http://nodejs.org/api/modules.html.
 
 **************************************************************/
-let data = {};
-data.results = [];
-let requestHandler = function(request, response) {
+
   // Request and Response come from node's http module.
   //
   // They include information about both the incoming request, such as
@@ -32,22 +30,12 @@ let requestHandler = function(request, response) {
   // const { method, url } = request;
   //method = GET, POST, OPTIONS etc.
   //url = /classes/messages?order=-createdAt
-  
-  
-  if (request.method === 'POST' || request.method === 'GET') {
-    
-    request.on('data', (chunk) => {
-      data.results += chunk;
-    }).on('end', (body) => {
-      console.log( '-----body---->' + body);
-      
-      response.end('something something dark side');
-    });
-  } else {
-    response.statusCode = 404;
-    response.end('nothing goin on');
-  }
 
+
+
+  let storage = {results:[]};
+
+  let requestHandler = function(request, response) {
 
   console.log('Serving request type ' + request.method + ' for url ' + request.url);
 
@@ -61,13 +49,39 @@ let requestHandler = function(request, response) {
   //
   // You will need to change this if you are sending something
   // other than plain text, like JSON or HTML.
+  const {method, url} = request;
   headers['Content-Type'] = 'application/json';
+  if(url !== '/classes/messages'){
+    response.writeHead(404, headers)
+    response.end('404 Error');
+  } else {
+    if (method === 'OPTIONS' ){
+      response.writeHead(201, headers);
+      response.end(JSON.stringify(headers))
+    }
+    if (method === 'POST'){
+      response.writeHead(201, headers);
+      var body = '';
+      request.on('data', function(data){
+        body += data;
+      })
+      request.on('end', function(){
+        storage.results.push(JSON.parse(body));
+        // response.end(JSON.stringify(storage))
+      });
+    }
+    if (method === 'GET'){
+      response.writeHead(200, headers);
+      response.end(JSON.stringify(storage));
+    }
+    response.end(JSON.stringify(storage))
+  }
+
+
 
   // .writeHead() writes to the request line and headers of the response,
   // which includes the status and all headers.
-  response.writeHead(statusCode, headers);
-  const responseBody = {headers, method, url, body}
-  response.write(JSON.stringify(responseBody));
+  // response.writeHead(statusCode, headers);
 
   // Make sure to always call response.end() - Node may not send
   // anything back to the client until you do. The string you pass to
@@ -77,7 +91,7 @@ let requestHandler = function(request, response) {
   // Calling .end "flushes" the response's internal buffer, forcing
   // node to actually send all the data over to the client.
 
-  response.end(JSON.stringify(data));
+  // response.end(JSON.stringify(data.results));
 };
 
 // These headers will allow Cross-Origin Resource Sharing (CORS).
@@ -92,7 +106,8 @@ let requestHandler = function(request, response) {
 var defaultCorsHeaders = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'access-control-allow-headers': 'content-type, accept',
+  'access-control-allow-credentials': true,
+  'access-control-allow-headers': 'content-type, accept, X-Requested-With, X-HTTP-Method-Override, Content-Type, Accept',
   'access-control-max-age': 10 // Seconds.
 };
 
